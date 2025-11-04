@@ -79,10 +79,32 @@ maze_v0 = [
 ]
 
 
-# Available room configurations
-available_configs = {
+# Dictionary to hold available configurations
+import random
+class ConfigDict(dict):
+    """A dictionary that supports sampling random values."""
+
+    def sample(self):
+        """Return a random configuration from the available configs."""
+        if not self:
+            raise ValueError("No configurations available to sample from")
+        return random.choice(list(self.values()))
+
+    def __repr__(self):
+        """Return a string representation of the dictionary."""
+        return self.keys().__repr__()
+
+# Dictionary to hold available configurations
+available_configs = ConfigDict({
     "two_rooms_penalty_v0": two_rooms_penalty_v0,
     "four_rooms_penalty_v0": four_rooms_penalty_v0,
     "larger_room_v0": larger_room,
     "maze_v0": maze_v0,
-}
+})
+
+
+if __name__ == "__main__":
+    # Example usage
+    print("Available Configurations:", available_configs)
+    config = available_configs.sample()
+    print("Sampled Config:\n", config)
