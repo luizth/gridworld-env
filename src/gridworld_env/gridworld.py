@@ -457,138 +457,86 @@ class GridWorld:
             plt.show()
         plt.close()
 
-    def plot_successor_heatmap(
-        self,
-        successor_matrix: NDArray[float],
-        state_idx: Optional[int] = None,
-        file_name: Optional[str] = None,
-        plot_regular_room: bool = False,
-        plot_color_axis: bool = True,
-    ) -> None:
-        """
-        Plot the successor representation values as a heatmap overlaid on the environment.
+    def plot_room_3d_surface(
+            self,
+            state_idx_to_score,
+            file_name=None
+        ):
+        # Create a 2D array to hold scores for the surface
+        score_grid = np.full((self.room_height, self.room_width), np.nan)
 
-        Args:
-            successor_matrix: The successor representation matrix of shape (num_states, num_states)
-            state_idx: Optional index of the state whose successor values to visualize
-            file_name: Optional file name to save the plot
-            plot_regular_room: If True, plots both room and heatmap side by side. If False, only plots heatmap
-        """
-        # Create base RGB array for the environment
-        rgb_array = self.__get_rgb_array()
-
-        # Create a heatmap array of the same size as the environment
-        heatmap = np.zeros((self.room_height, self.room_width))
-        # Set walls to -1 (will appear black in the heatmap)
-        heatmap[self.room_array == StateType.WALL] = -1
-
-        # If state_idx is None, use average successor values for each state
-        if state_idx is None:
-            successor_values = successor_matrix.mean(axis=0)
-        else:
-            successor_values = successor_matrix[state_idx]
-
-        # Map successor values to the grid (for all non-wall states)
-        for idx, coords in self.state_idx_to_coordinates.items():
+        # Fill in scores for valid states (including goal)
+        for state_idx, coords in self.state_idx_to_coordinates.items():
             x, y = coords
-            heatmap[y, x] = successor_values[idx]
+            score = state_idx_to_score[state_idx]
+            score_grid[y, x] = score
 
-        # Normalize heatmap values to [0, 1], keeping walls at -1
-        wall_mask = self.room_array == StateType.WALL
-        non_wall_mask = ~wall_mask
+        # Get goal position
+        gx, gy = self.goal_state
 
-        if heatmap[non_wall_mask].max() > heatmap[non_wall_mask].min():
-            heatmap_normalized = np.zeros_like(heatmap)
-            heatmap_normalized[wall_mask] = -1
-            heatmap_normalized[non_wall_mask] = (
-                heatmap[non_wall_mask] - heatmap[non_wall_mask].min()
-            ) / (heatmap[non_wall_mask].max() - heatmap[non_wall_mask].min())
-            heatmap = heatmap_normalized
+        # Create meshgrid for 3D plotting
+        X = np.arange(0, self.room_width, 1)
+        Y = np.arange(0, self.room_height, 1)
+        X, Y = np.meshgrid(X, Y)
 
-        if plot_regular_room:
-            # Create figure with two subplots
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 30))
+        # Z values are the scores
+        Z = score_grid
 
-            # Plot original environment
-            ax1.imshow(rgb_array, interpolation="nearest", aspect="equal")
-            ax1.set_title("Environment")
+        # Create 3D plot
+        fig = plt.figure(figsize=(12, 10))
+        ax = fig.add_subplot(111, projection='3d')
 
-            # Plot heatmap
-            im = ax2.imshow(
-                heatmap, cmap="viridis", interpolation="nearest", aspect="equal"
-            )
-            ax2.set_title("Successor Representation")
-            plt.colorbar(im, ax=ax2, shrink=0.5)
+        # Create the surface plot with red colormap
+        surf = ax.plot_surface(X, Y, Z, cmap='Purples',
+                              edgecolor='none',
+                              alpha=0.9,
+                              antialiased=True,
+                              vmin=np.nanmin(Z),
+                              vmax=np.nanmax(Z))
 
-            # Configure grid lines for both subplots
-            for ax in [ax1, ax2]:
-                ax.set_xticks(np.arange(-0.5, self.room_width, 1))
-                ax.set_yticks(np.arange(-0.5, self.room_height, 1))
-                ax.grid(which="major", color="black", linewidth=0.5)
-                ax.tick_params(
-                    axis="both",
-                    which="both",
-                    length=0,
-                    labelbottom=False,
-                    labelleft=False,
-                )
-        else:
-            # Create figure with single plot
-            plt.figure(figsize=(24, 30))
-            im = plt.imshow(
-                heatmap, cmap="viridis", interpolation="nearest", aspect="equal"
-            )
-            if plot_color_axis:
-                plt.colorbar(im, shrink=0.1)
-            # plt.title("Successor Representation")
+        # Set viewing angle (adjust these for different perspectives)
+        ax.view_init(elev=25, azim=45)  # elevation and azimuth angles
 
-            # Configure grid lines
-            plt.xticks(np.arange(-0.5, self.room_width, 1))
-            plt.yticks(np.arange(-0.5, self.room_height, 1))
-            plt.grid(which="major", color="black", linewidth=0.5)
-            plt.tick_params(
-                axis="both", which="both", length=0, labelbottom=False, labelleft=False
-            )
+        # Labels
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Score')
 
-        if state_idx is not None:
-            state = self.state_idx_to_coordinates[state_idx]
-            if plot_regular_room:
-                ax1.plot(
-                    state[0],
-                    state[1],
-                    marker="*",
-                    color="blue",
-                    markersize=15,
-                    label="Selected State",
-                )
-                ax2.plot(
-                    state[0],
-                    state[1],
-                    marker="*",
-                    color="blue",
-                    markersize=15,
-                    label="Selected State",
-                )
-                ax1.legend()
-                ax2.legend()
-            else:
-                plt.plot(
-                    state[0],
-                    state[1],
-                    marker="*",
-                    color="blue",
-                    markersize=15,
-                    label="Selected State",
-                )
-                plt.legend()
+        # Hide the grid
+        ax.grid(False)
+
+        # Or if you want to hide the panes (background walls) as well:
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+
+        # To make panes completely invisible (remove the light gray background):
+        ax.xaxis.pane.set_edgecolor('none')
+        ax.yaxis.pane.set_edgecolor('none')
+        ax.zaxis.pane.set_edgecolor('none')
+
+        # Hide X and Y axis lines, keep only Z (Score) axis
+        #ax.xaxis.line.set_visible(False)
+        #ax.yaxis.line.set_visible(False)
+
+        # Add colorbar
+        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
+
+        # Optional: Mark the goal position with a marker
+        if not np.isnan(score_grid[gy, gx]):
+            ax.scatter([gx], [gy], [score_grid[gy, gx]],
+                      color='gold', s=100, marker='*',
+                      edgecolors='black', linewidths=1.5,
+                      zorder=10)
 
         plt.tight_layout()
 
         if file_name:
-            plt.savefig(file_name, transparent=True, bbox_inches="tight", dpi=300)
+            plt.savefig(file_name, bbox_inches="tight", dpi=200,
+                       facecolor='white', edgecolor='none')
         else:
             plt.show()
-            plt.close()
+        plt.close()
 
     def __get_rgb_array(self) -> NDArray[float]:
         rgb_array = np.zeros((self.room_height, self.room_width, 3))
