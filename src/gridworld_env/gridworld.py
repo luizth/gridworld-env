@@ -396,6 +396,66 @@ class GridWorld:
             plt.show()
             plt.close()
 
+    def plot_room_with_scores_heatmap( self, state_idx_to_score, file_name=None) -> None:
+        # Create a 2D array to hold scores for the heatmap
+        score_grid = np.full((self.room_height, self.room_width), np.nan)
+
+        # Fill in scores for valid states (including goal)
+        for state_idx, coords in self.state_idx_to_coordinates.items():
+            x, y = coords
+            score = state_idx_to_score[state_idx]
+            score_grid[y, x] = score
+
+        # Get goal position
+        gx, gy = self.goal_state
+
+        # Create plot with proper aspect ratio
+        cell_size = 0.6  # inches per cell
+        fig_width = self.room_width * cell_size
+        fig_height = self.room_height * cell_size
+
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+        # Get the actual min/max of valid scores (excluding NaN walls)
+        valid_scores = score_grid[~np.isnan(score_grid)]
+        vmin = np.min(valid_scores)
+        vmax = np.max(valid_scores)
+
+        # Create heatmap with purple color scheme
+        cmap = plt.cm.Purples.copy()  # Light lavender → deep purple
+        cmap.set_bad(color='#1a2332')  # Darker blue-gray for walls
+
+        # Use normalized range for better color distribution
+        im = ax.imshow(score_grid, cmap=cmap, interpolation='nearest',
+                      aspect='equal', origin='upper',
+                      vmin=vmin, vmax=vmax)
+
+        # Paint goal cell with specific color
+        goal_rect = plt.Rectangle((gx-0.5, gy-0.502), 1.01, 1-0.002,
+                                  fill=True, color='#D9946C',
+                                  linewidth=0, zorder=10)
+        ax.add_patch(goal_rect)
+
+        # Add colorbar
+        cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label('Score', rotation=270, labelpad=15)
+
+        # Remove ticks and labels for clean look
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        # Remove axis spines for cleaner look
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+        plt.tight_layout()
+
+        if file_name:
+            plt.savefig(file_name, bbox_inches="tight", dpi=200,
+                       facecolor='white', edgecolor='none')
+        else:
+            plt.show()
+        plt.close()
 
     def plot_successor_heatmap(
         self,
